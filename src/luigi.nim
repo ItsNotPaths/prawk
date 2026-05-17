@@ -1,5 +1,11 @@
-## Hand-rolled minimal Nim binding for nakst/luigi v1 single-header UI.
+## Hand-rolled minimal Nim binding for the wayluigi single-header UI
+## (ItsNotPaths/wayluigi, a fork of nakst/luigi that adds a Wayland backend).
 ## Covers only the surface prawk uses; replaces the (broken) luiginim binding.
+##
+## Build flavor is picked at compile time:
+##   default          → UI_LINUX (X11), links libX11
+##   -d:wayland       → UI_WAYLAND, links wayland-client/cursor/xkbcommon and
+##                      pulls in vendor/luigi/wayluigi_wayland.c
 ##
 ## Layouts are mirrored from vendor/luigi/luigi.h. `intptr_t` C fields are
 ## declared as Nim `int` (8 bytes on x64 to match), not `cint`.
@@ -11,10 +17,19 @@ when not defined(linux):
 
 const luigiDir = currentSourcePath().parentDir().parentDir() / "vendor" / "luigi"
 
-{.passC: "-DUI_LINUX -DUI_FREETYPE".}
 {.passC: "-I\"" & luigiDir & "\"".}
 {.passC: "-I\"" & (luigiDir / "freetype") & "\"".}
-{.passL: "-lX11 -lm -l:libfreetype.so.6".}
+{.passC: "-DUI_FREETYPE".}
+{.passL: "-lm -l:libfreetype.so.6".}
+
+when defined(wayland):
+  {.passC: "-DUI_WAYLAND".}
+  {.passL: "-lwayland-client -lwayland-cursor -lxkbcommon -lrt".}
+  {.compile: luigiDir / "wayluigi_wayland.c".}
+else:
+  {.passC: "-DUI_LINUX".}
+  {.passL: "-lX11".}
+
 {.compile: currentSourcePath().parentDir() / "luigi_impl.c".}
 
 {.pragma: lH, header: "luigi.h".}

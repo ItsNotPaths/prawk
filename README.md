@@ -2,10 +2,16 @@
   <img src="assets/prawk-logo.svg" alt="prawk" width="220">
 </p>
 
-A tiny X11 dev environment using nakst/luigi.c: file tree, tabbed editor with syntax highlighting, N
-embedded terminals, a git pane, and a master command-line. Linux x86_64. ~250 KB
-stripped binary, single file. Runtime deps: `libX11`, `libfreetype.so.6`, `git`,
-`xclip`, `fc-match`.
+A tiny dev environment using [wayluigi](https://github.com/ItsNotPaths/wayluigi)
+(a Wayland-enabled fork of nakst/luigi.c): file tree, tabbed editor with syntax
+highlighting, N embedded terminals, a git pane, and a master command-line.
+Linux x86_64. ~250 KB stripped binary, single file. Ships as two flavors:
+
+- **`prawk`** — X11. Runtime deps: `libX11`, `libfreetype.so.6`, `git`,
+  `xclip`, `fc-match`.
+- **`prawk-wayland`** — Wayland. Runtime deps: `libwayland-client`,
+  `libwayland-cursor`, `libxkbcommon`, `libfreetype.so.6`, `git`,
+  `wl-clipboard` (`wl-copy` / `wl-paste`), `fc-match`.
 
 ![alt text](https://files.paths.place/prawk-ss-1.png)
 ![alt text](https://files.paths.place/prawk-ss-2.png)
@@ -167,7 +173,10 @@ menu. Ships with `default` and `zenburn`.
 ./release.sh --local
 ```
 
-Produces `../prawk-release/prawk`.
+Produces `../prawk-release/prawk` (X11) and `../prawk-release/prawk-wayland`
+(Wayland). Both flavors are built from the same source — the backend is
+picked at compile time via `-d:wayland`. Build-time deps are the union of
+both runtime sets: X11, Wayland, xkbcommon, and freetype development headers.
 
 ## License
 

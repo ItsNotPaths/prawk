@@ -3,3 +3,4 @@ nimcache/
 build/
 *.o
 move.sh
+prawk-debug

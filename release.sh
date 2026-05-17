@@ -41,7 +41,6 @@ if [ $DO_LOCAL -eq 1 ]; then
     echo "==> Local build: $PROJECT_NAME -> $RELEASE_DIR"
     mkdir -p "$RELEASE_DIR"
 
-    BIN="$RELEASE_DIR/$PROJECT_NAME"
     # Trimming flags layered on top of -d:danger/-d:strip/-d:lto:
     #   -d:danger                — drops range/bounds/nil/overflow checks (~33 KB).
     #                              Saves are atomic (saveAtomic, editor.nim) so a
@@ -61,20 +60,33 @@ if [ $DO_LOCAL -eq 1 ]; then
     #                              network-facing daemon.
     #   -Wl,--build-id=none      — drops the build-id note
     #   -Wl,-z,norelro           — minor; relro section trim
-    ( cd "$PROJECT_DIR" && \
-      nim c --opt:size -d:danger -d:strip -d:lto \
-            -d:noSignalHandler \
-            --threads:off --panics:on \
-            --stackTrace:off --lineTrace:off \
-            --passC:-fno-pie --passL:-no-pie \
-            --passC:-ffunction-sections --passC:-fdata-sections \
-            --passC:-fno-asynchronous-unwind-tables \
-            --passC:-fno-unwind-tables \
-            --passC:-fno-stack-protector \
-            --passL:-Wl,--gc-sections \
-            --passL:-Wl,--build-id=none \
-            --passL:-Wl,-z,norelro \
-            --out:"$BIN" src/prawk.nim )
+    build_flavor() {
+        local out="$1"; shift
+        ( cd "$PROJECT_DIR" && \
+          nim c --opt:size -d:danger -d:strip -d:lto \
+                -d:noSignalHandler \
+                --threads:off --panics:on \
+                --stackTrace:off --lineTrace:off \
+                --passC:-fno-pie --passL:-no-pie \
+                --passC:-ffunction-sections --passC:-fdata-sections \
+                --passC:-fno-asynchronous-unwind-tables \
+                --passC:-fno-unwind-tables \
+                --passC:-fno-stack-protector \
+                --passL:-Wl,--gc-sections \
+                --passL:-Wl,--build-id=none \
+                --passL:-Wl,-z,norelro \
+                --nimcache:"$RELEASE_DIR/.nimcache-$(basename "$out")" \
+                "$@" \
+                --out:"$out" src/prawk.nim )
+    }
+
+    BIN_X11="$RELEASE_DIR/$PROJECT_NAME"
+    BIN_WL="$RELEASE_DIR/${PROJECT_NAME}-wayland"
+
+    echo "  -> X11 build"
+    build_flavor "$BIN_X11"
+    echo "  -> Wayland build"
+    build_flavor "$BIN_WL" -d:wayland
 
     [ -f "$PROJECT_DIR/README.md" ]    && cp -f "$PROJECT_DIR/README.md"    "$RELEASE_DIR/" || true
     [ -f "$PROJECT_DIR/gpl-3.0.txt" ]  && cp -f "$PROJECT_DIR/gpl-3.0.txt"  "$RELEASE_DIR/" || true
@@ -83,8 +95,11 @@ if [ $DO_LOCAL -eq 1 ]; then
         cp -R "$PROJECT_DIR/themes" "$RELEASE_DIR/themes"
     fi
 
-    SIZE=$(du -h "$BIN" | cut -f1)
-    echo "==> Local done: $BIN (${SIZE})"
+    SIZE_X11=$(du -h "$BIN_X11" | cut -f1)
+    SIZE_WL=$(du -h "$BIN_WL"  | cut -f1)
+    echo "==> Local done:"
+    echo "    $BIN_X11 (${SIZE_X11})"
+    echo "    $BIN_WL  (${SIZE_WL})"
 fi
 
 if [ $DO_PUBLIC -eq 1 ]; then

@@ -26,12 +26,17 @@ fetch() {
     echo "  done."
 }
 
-echo "==> luigi"
+echo "==> luigi (wayluigi fork — adds Wayland backend alongside X11)"
 if [ -d "$VENDOR/luigi" ] && [ -f "$VENDOR/luigi/luigi.h" ]; then
+    if [ ! -f "$VENDOR/luigi/wayluigi_wayland.c" ]; then
+        echo "  vendor/luigi looks like the old nakst clone (no wayluigi_wayland.c)."
+        echo "  remove it and re-run: rm -rf vendor/luigi" >&2
+        exit 1
+    fi
     echo "  already present: luigi"
 else
-    echo "  cloning luigi..."
-    git clone --depth=1 "https://github.com/nakst/luigi.git" "$VENDOR/luigi"
+    echo "  cloning wayluigi..."
+    git clone --depth=1 "https://github.com/ItsNotPaths/wayluigi.git" "$VENDOR/luigi"
     echo "  done."
 fi
 
