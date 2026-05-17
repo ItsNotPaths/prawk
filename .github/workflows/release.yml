@@ -113,6 +113,10 @@ jobs:
 
       - name: Package
         run: |
+          # actions/upload-artifact strips the exec bit on file upload, so the
+          # downloaded trees come back mode 644. Restore +x on the binaries
+          # before zipping or users get 126 (Permission denied) on launch.
+          chmod +x "linux-x11/${PROJECT_NAME}" "linux-wayland/${PROJECT_NAME}-wayland"
           (cd linux-x11     && zip -r "../${PROJECT_NAME}-linux-x11.zip"     .)
           (cd linux-wayland && zip -r "../${PROJECT_NAME}-linux-wayland.zip" .)
 
