@@ -53,6 +53,12 @@ jobs:
         uses: jiro4989/setup-nim-action@v2
         with:
           nim-version: '2.0.x'
+          # setup-nim-action@v2 hits the GitHub API to resolve the version
+          # range. Pass GITHUB_TOKEN so the request is authenticated and
+          # doesn't get throttled to the 60/hr anonymous rate limit (which
+          # silently degrades into a "tar: This does not look like a tar
+          # archive" further down the install script).
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install ${{ matrix.flavor }} dev headers
         run: sudo apt-get update && sudo apt-get install -y ${{ matrix.apt_packages }}
