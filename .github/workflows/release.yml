@@ -36,10 +36,10 @@ jobs:
             nim_define: '-d:wayland'                # → UI_WAYLAND in src/luigi.nim
             apt_packages: 'libwayland-dev libxkbcommon-dev libfreetype-dev fontconfig'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Cache vendor/
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: vendor
           key: vendor-linux-${{ hashFiles('download-deps.sh') }}
@@ -50,7 +50,7 @@ jobs:
           ./download-deps.sh
 
       - name: Install toolchain
-        uses: jiro4989/setup-nim-action@v1
+        uses: jiro4989/setup-nim-action@v2
         with:
           nim-version: '2.0.x'
 
@@ -90,7 +90,7 @@ jobs:
           [ -f gpl-3.0.txt ]  && cp gpl-3.0.txt  dist/ || true
           [ -d themes ]       && cp -R themes    dist/ || true
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: linux-${{ matrix.flavor }}
           path: dist
@@ -101,12 +101,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: linux-x11
           path: linux-x11
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: linux-wayland
           path: linux-wayland
