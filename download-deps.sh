@@ -12,6 +12,8 @@
 # After fetching, registers rawk-luigi and rawk-bufferlib via `nimble develop`
 # and runs `nimble setup` so plain `nim c` resolves them through nimble.paths.
 # Idempotent — safe to re-run.
+#
+# cache-bust: 2026-05-18  (rawk-bufferlib scope-guides API addition)
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
