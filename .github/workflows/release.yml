@@ -33,21 +33,10 @@ jobs:
             apt_packages: 'libx11-dev libfreetype-dev fontconfig'
           - flavor: wayland
             bin: prawk-wayland
-            nim_define: '-d:wayland'                # → UI_WAYLAND in src/luigi.nim
+            nim_define: '-d:wayland'                # → UI_WAYLAND in rawk_luigi
             apt_packages: 'libwayland-dev libxkbcommon-dev libfreetype-dev fontconfig'
     steps:
       - uses: actions/checkout@v6
-
-      - name: Cache vendor/
-        uses: actions/cache@v5
-        with:
-          path: vendor
-          key: vendor-linux-${{ hashFiles('download-deps.sh') }}
-
-      - name: Download deps
-        run: |
-          chmod +x ./download-deps.sh
-          ./download-deps.sh
 
       - name: Install toolchain
         uses: jiro4989/setup-nim-action@v2
@@ -59,6 +48,20 @@ jobs:
           # silently degrades into a "tar: This does not look like a tar
           # archive" further down the install script).
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache vendor/
+        uses: actions/cache@v5
+        with:
+          path: vendor
+          key: vendor-linux-${{ hashFiles('download-deps.sh') }}
+
+      - name: Download deps
+        # Must run AFTER toolchain install: download-deps.sh invokes
+        # `nimble develop` + `nimble setup` to wire rawk-luigi/rawk-bufferlib
+        # paths into config.nims so plain `nim c` finds them.
+        run: |
+          chmod +x ./download-deps.sh
+          ./download-deps.sh
 
       - name: Install ${{ matrix.flavor }} dev headers
         run: sudo apt-get update && sudo apt-get install -y ${{ matrix.apt_packages }}
