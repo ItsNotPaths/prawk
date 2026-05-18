@@ -174,6 +174,7 @@ proc treeRefresh*() =
 
 proc swapBackToTree(args: seq[string]) =
   if theTreePane == nil: return
+  if commands.sidebarEnsureVisibleCb != nil: commands.sidebarEnsureVisibleCb()
   treeRefresh()
   paneSetProvider(theTreePane, treeProvider())
   if theTreePane.e.window != nil:

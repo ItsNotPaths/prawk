@@ -386,6 +386,8 @@ proc onSentinelLine() =
     # grep flow batches: hits commit only at the boundary so the panel
     # doesn't churn rows-by-rows while a long grep is still running.
     theGrepState.hits = theClShell.pendingHits
+    if hadHits and commands.sidebarEnsureVisibleCb != nil:
+      commands.sidebarEnsureVisibleCb()
     swapTo(grepProvider())
   # shell flow: lines already streamed into theShellState.lines via
   # streamShellLine; panel already swapped at enterShellMode. Nothing to
@@ -438,10 +440,16 @@ proc shellAutoScroll() =
   elementRepaint(addr theClPane.e, nil)
 
 proc streamShellLine(body: string) =
+  let first = theShellState.lines.len == 0
   theShellState.lines.add(body)
   if theClPane == nil: return
   if theClPane.current.name != "shell":
     swapTo(shellProvider())
+  # First line of a shell run = "this command actually produced output" —
+  # the cue used to pop the sidebar back open in `:ts` mode. Commands like
+  # `cd` that finish silently leave the sidebar hidden.
+  if first and commands.sidebarEnsureVisibleCb != nil:
+    commands.sidebarEnsureVisibleCb()
   shellAutoScroll()
 
 proc onCompletedLine(raw: string) =
@@ -593,7 +601,9 @@ proc clShellInstall*(pane: ptr ResultsPane) =
   theClPane = pane
   commands.clDispatchCb = proc(line: string) = clDispatch(line)
   commands.clShellCwdCb = proc(): string = clShellCurrentCwd()
-  registerCommand("cl", proc(args: seq[string]) = swapTo(clProvider()))
+  registerCommand("cl", proc(args: seq[string]) =
+    if commands.sidebarEnsureVisibleCb != nil: commands.sidebarEnsureVisibleCb()
+    swapTo(clProvider()))
   registerCommand("cl.interrupt", proc(args: seq[string]) = clShellInterrupt())
   registerCommand("grep", cmdGrep)
   # Hijack `ls` → `files`. Registry runs before the shell fall-through, so

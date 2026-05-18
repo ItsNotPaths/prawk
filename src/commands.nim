@@ -14,6 +14,10 @@ var
   clDispatchCb*: proc(line: string) {.closure.}
   clShellCwdCb*: proc(): string {.closure.}
   treeRefreshCb*: proc() {.closure.}
+  sidebarEnsureVisibleCb*: proc() {.closure.}
+    ## Cross-module hook used by content producers (tree, providers, shell
+    ## stream, grep results) to pop the sidebar into view if `:ts` has it
+    ## hidden. Assigned by ui at startup; callers null-check.
 
 proc registerCommand*(name: string, p: CmdProc) =
   for i in 0 ..< registry.len:
@@ -195,6 +199,21 @@ proc cmdMinimap(args: seq[string]) =
   config.minimapEnabled = on
   config.setConfigKey("minimap", if on: "on" else: "off")
 
+proc cmdScopeGuides(args: seq[string]) =
+  ## `:scope_guides` toggles. `:scope_guides on|off` sets explicitly.
+  ## Persists to config. Repaints the editor so the change is visible.
+  var on = not config.scopeGuidesEnabled
+  if args.len >= 1:
+    case args[0].toLowerAscii
+    of "on", "true", "1", "yes":  on = true
+    of "off", "false", "0", "no": on = false
+    of "toggle":                  on = not config.scopeGuidesEnabled
+    else: return
+  config.scopeGuidesEnabled = on
+  config.setConfigKey("scope_guides", if on: "on" else: "off")
+  if theEditor != nil:
+    elementRepaint(addr theEditor.e, nil)
+
 proc registerBuiltins*() =
   registerCommand("terminal.update", cmdTerminalUpdate)
   registerCommand("tu", cmdTerminalUpdate)
@@ -220,3 +239,4 @@ proc registerBuiltins*() =
   registerCommand("tab.close", cmdTabClose)
   registerCommand("tab.close.force", cmdTabCloseForce)
   registerCommand("minimap", cmdMinimap)
+  registerCommand("scope_guides", cmdScopeGuides)

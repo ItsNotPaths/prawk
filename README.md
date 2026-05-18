@@ -41,6 +41,7 @@ Config (optional): `~/.config/prawk/config` — see [Config](#config) below.
 | `Alt+Q` | Close active editor tab (if editor focused) / kill terminal (if terminal focused) |
 | `Alt+Shift+P` | Lock / unlock the focused terminal (skipped on project change) |
 | `Alt+M` | Toggle minimap |
+| `Alt+G` | Toggle scope guides (indent / brace nesting lines) |
 | `Alt+Z` | Toggle soft-wrap in the editor |
 
 ### Master command line (Alt+C)
@@ -122,6 +123,8 @@ outline clears on the first keystroke or when you Esc/Enter.
 | `:jump <N>` / `:j <N>` / `:j +N` / `:j -N` | Jump to absolute / relative line |
 | `:theme <name>` | Switch theme (`default`, `zenburn`) |
 | `:minimap` | Toggle minimap |
+| `:scope_guides [on\|off]` | Toggle vertical guides for indent / brace nesting; cursor's enclosing scopes use the accent colour, others a dimmed shade |
+| `:ts` / `:toggle-sidebar [on\|off]` | Hide / show the tree + git sidebar. While hidden, any CL command that produces output (`:tree`, `:grep`, `:cl`, `:gst`, `:glog`, shell stream first line) auto-pops the sidebar back; it retracts again once focus returns to the editor or terminal |
 | `:reader [on\|off]` | Toggle reader mode (hide terminal column) |
 | `:terminal.update [path]` / `:tu [path]` | Broadcast a target dir to tree, git pane, and unlocked terminals. Bare form uses the CL's current cwd. |
 | `:editor.open <path>` / `:editor.save` | Open / save |
@@ -147,6 +150,8 @@ cursor_mode: insert            # insert | normal
 clear_on_project_cd: false     # also `clear` after cd on project change
 terminal_copy_paste: ide       # ide (Ctrl+C copies if selection) | legacy
 minimap: on
+scope_guides: on
+sidebar: on
 grep_ignore: vendor,build,.git,node_modules
 ```
 

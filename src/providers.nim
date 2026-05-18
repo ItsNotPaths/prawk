@@ -89,6 +89,7 @@ proc helpProvider*(): Provider =
 # ---------- install ----------
 
 proc swapTo(prov: Provider) =
+  if commands.sidebarEnsureVisibleCb != nil: commands.sidebarEnsureVisibleCb()
   paneSwapTo(theProvidersPane, prov)
 
 proc providersInstall*(pane: ptr ResultsPane) =

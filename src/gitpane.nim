@@ -657,6 +657,7 @@ proc gitPaneCreate*(parent: ptr Element): ptr GitPane =
   return g
 
 proc cmdGst(args: seq[string]) =
+  if commands.sidebarEnsureVisibleCb != nil: commands.sidebarEnsureVisibleCb()
   gitPaneRefresh()
   if theGitPane != nil:
     elementFocus(addr theGitPane.e)
@@ -664,6 +665,7 @@ proc cmdGst(args: seq[string]) =
 proc cmdGlog(args: seq[string]) =
   let g = theGitPane
   if g == nil: return
+  if commands.sidebarEnsureVisibleCb != nil: commands.sidebarEnsureVisibleCb()
   if args.len >= 1 and args[0].len > 0:
     g.selectedBranch = args[0]
   loadLog(g)

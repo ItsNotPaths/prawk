@@ -13,6 +13,11 @@ var
   innerSplitRef: ptr SplitPane
   readerMode: bool = false
   savedInnerSplitWeight: cfloat = 0.65
+  rootSplitRef: ptr SplitPane
+  sidebarEl: ptr Element            # the sidebarSplit element (tree + git)
+  sidebarHidden: bool = false       # user's persistent intent (config-backed)
+  sidebarPoppedOpen: bool = false   # currently auto-popped from output
+  savedRootSplitWeight: cfloat = 0.18
 
 when defined(termDebug):
   proc log(msg: string) =
@@ -26,6 +31,14 @@ proc isInTermStack(e: ptr Element): bool =
   var cur = e
   while cur != nil:
     if cur == termHostEl: return true
+    cur = cur.parent
+  false
+
+proc isInSidebar(e: ptr Element): bool =
+  if sidebarEl == nil or e == nil: return false
+  var cur = e
+  while cur != nil:
+    if cur == sidebarEl: return true
     cur = cur.parent
   false
 
@@ -75,7 +88,8 @@ proc onWinMsg(element: ptr Element, message: Message, di: cint, dp: pointer): ci
 
     if left:
       if col == 2: focusCol(1)
-      elif col == 1: focusCol(0)
+      elif col == 1 and not (sidebarHidden and not sidebarPoppedOpen):
+        focusCol(0)
     elif right:
       if col == 0: focusCol(1)
       elif col == 1 and not readerMode: focusCol(2)
@@ -130,6 +144,55 @@ proc setReaderMode(on: bool) =
   elementRefresh(addr innerSplitRef.e)
 
 proc readerModeOn*(): bool = readerMode
+
+proc applySidebarVisibility(visible: bool) =
+  ## Drive the actual luigi state: split weight + hide flag. Idempotent —
+  ## the visible-bool argument is the desired physical state, independent of
+  ## whether the cause was `:ts` or an auto-pop.
+  if rootSplitRef == nil or sidebarEl == nil: return
+  let currentlyVisible = (sidebarEl.flags and ELEMENT_HIDE) == 0
+  if visible == currentlyVisible: return
+  if not visible:
+    savedRootSplitWeight = rootSplitRef.weight
+    rootSplitRef.weight = 0.0
+    sidebarEl.flags = sidebarEl.flags or ELEMENT_HIDE
+    let win = if sidebarEl.window != nil: sidebarEl.window else: nil
+    if win != nil and win.focused != nil and isInSidebar(win.focused) and
+       editorEl != nil:
+      focusElement(editorEl)
+  else:
+    rootSplitRef.weight = savedRootSplitWeight
+    sidebarEl.flags = sidebarEl.flags and not ELEMENT_HIDE
+  elementRefresh(addr rootSplitRef.e)
+
+proc sidebarEnsureVisible*() =
+  ## Called by content producers (tree refresh, grep results, shell stream
+  ## first-line, etc.). No-op when the sidebar is already on screen.
+  if not sidebarHidden: return
+  if sidebarPoppedOpen: return    # already popped — leave alone
+  sidebarPoppedOpen = true
+  applySidebarVisibility(true)
+
+proc sidebarSetHidden*(hidden: bool) =
+  ## `:ts` entry point. Sets the persistent intent, clears any auto-popped
+  ## state, and updates luigi.
+  sidebarHidden = hidden
+  sidebarPoppedOpen = false
+  applySidebarVisibility(not hidden)
+
+proc sidebarTickCheck() =
+  ## Called from pump.onTick at ~50 Hz. When the sidebar is auto-popped
+  ## (sidebarHidden + sidebarPoppedOpen), retract it once focus has moved
+  ## into the editor or terminal column. CL / menubar focus (col -1) and
+  ## sidebar focus (col 0) keep it open.
+  if not (sidebarHidden and sidebarPoppedOpen): return
+  let e = if sidebarEl != nil and sidebarEl.window != nil: sidebarEl.window.focused
+          else: nil
+  if e == nil: return
+  let col = columnOf(e)
+  if col == 1 or col == 2:
+    sidebarPoppedOpen = false
+    applySidebarVisibility(false)
 
 proc altQDispatch(cp: pointer) {.cdecl.} =
   ## Routes Alt+Q by focused column: editor (body or tab strip) → close active
@@ -197,7 +260,8 @@ proc buildUi*(): UiRefs =
     recordOpen:      proc(p: string)        = config.pushRecent("recents.files", p),
     onTabsChanged:   proc() =
       if editortabs.theEditorTabs != nil:
-        elementRepaint(addr editortabs.theEditorTabs.e, nil))
+        elementRepaint(addr editortabs.theEditorTabs.e, nil),
+    scopeGuides:     proc(): bool           = config.scopeGuidesEnabled)
   result.editor = editorCreate(addr result.editorBody.e,
                                ELEMENT_V_FILL or ELEMENT_H_FILL, editorHost)
   editor_ref.theEditor = result.editor
@@ -222,6 +286,32 @@ proc buildUi*(): UiRefs =
   termHostEl   = addr result.termStack.e
   termStackRef = result.termStack
   innerSplitRef = result.innerSplit
+  rootSplitRef = result.rootSplit
+  sidebarEl    = addr result.sidebarSplit.e
+
+  # Wire cross-module hooks: content producers ensure-visible, pump tick
+  # drives the auto-hide check when the sidebar is in popped state.
+  commands.sidebarEnsureVisibleCb = sidebarEnsureVisible
+  pump.onTick = sidebarTickCheck
+
+  # Honor persisted hidden state. Toggled later via :ts / :toggle-sidebar.
+  if not config.sidebarVisible:
+    sidebarHidden = true
+    applySidebarVisibility(false)
+
+  registerCommand("toggle-sidebar", proc(args: seq[string]) =
+    let on =
+      if args.len >= 1:
+        case args[0].toLowerAscii
+        of "on", "true", "1", "yes":  true
+        of "off", "false", "0", "no": false
+        else: sidebarHidden
+      else: not sidebarHidden
+    sidebarSetHidden(on)
+    config.sidebarVisible = not on
+    config.setConfigKey("sidebar", if on: "off" else: "on"))
+  registerCommand("ts", proc(args: seq[string]) =
+    discard runCommand("toggle-sidebar", args))
 
   registerCommand("reader", proc(args: seq[string]) =
     let on =
@@ -282,12 +372,20 @@ proc buildUi*(): UiRefs =
     code: int(KEYCODE_LETTER('M')), alt: true,
     invoke: proc(cp: pointer) {.cdecl.} = discard runCommand("minimap"),
     cp: nil))
+  windowRegisterShortcut(result.window, Shortcut(
+    code: int(KEYCODE_LETTER('G')), alt: true,
+    invoke: proc(cp: pointer) {.cdecl.} = discard runCommand("scope_guides"),
+    cp: nil))
 
   startPump(result.window)
 
 proc applyInitialFocus*(refs: UiRefs) =
   case config.initialFocus
-  of ftTree:   focusElement(addr refs.pane.e)
+  of ftTree:
+    # Fall back to editor if the sidebar starts hidden — focusing a hidden
+    # pane would leave the user stuck with no visible cursor target.
+    if sidebarHidden: focusElement(addr refs.editor.e)
+    else: focusElement(addr refs.pane.e)
   of ftEditor: focusElement(addr refs.editor.e)
   of ftTerm:
     if refs.termStack != nil and refs.termStack.terms.len > 0:

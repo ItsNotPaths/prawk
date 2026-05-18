@@ -10,9 +10,11 @@ var
   lastMinimapBuf: pointer = nil
   lastMinimapLines: int = -1
   lastMinimapDirty: int = high(int)
+  onTick*: proc() {.closure.} = nil   # assigned by ui for sidebar auto-hide
 
 proc pumpMessage(e: ptr Element, m: Message, di: cint, dp: pointer): cint {.cdecl.} =
   if m == msgAnimate:
+    if onTick != nil: onTick()
     clShellDrain()
     drainAll()
     clTickShift(e.window)
