@@ -1,4 +1,4 @@
-import luigi, editor, highlight
+import rawk_luigi, rawk_bufferlib, editor_ref
 
 type
   Minimap* = object

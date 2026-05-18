@@ -1,5 +1,5 @@
 import std/strutils
-import luigi, commands, config, clshell, font, theme, clipboard
+import rawk_luigi, rawk_bufferlib, commands, config, clshell, theme
 
 type
   MenuOption = object

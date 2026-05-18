@@ -1,5 +1,5 @@
-import luigi
-import term, clshell, menubar, editor, config, minimap, gitpane
+import rawk_luigi, rawk_bufferlib
+import term, clshell, menubar, config, minimap, gitpane, editor_ref
 
 proc usleep(us: cuint): cint {.importc, header: "<unistd.h>", discardable.}
 

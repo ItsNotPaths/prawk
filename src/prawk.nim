@@ -1,5 +1,6 @@
 import std/os
-import ui, theme, font, project, commands, config, highlight
+import rawk_bufferlib
+import ui, theme, project, commands, config
 
 proc resolveArgv() =
   if paramCount() == 0:
@@ -20,7 +21,7 @@ config.loadConfig()
 theme.activeTheme = config.themePref
 loadInitialTheme()
 loadFont()
-highlight.loadAllSyntaxes()
+loadAllSyntaxes()
 resolveArgv()
 registerBuiltins()
 let refs = buildUi()

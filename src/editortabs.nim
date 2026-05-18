@@ -1,4 +1,4 @@
-import luigi, font, editor, theme
+import rawk_luigi, rawk_bufferlib, theme, editor_ref
 
 const
   tabPadX*: cint = 8
@@ -189,8 +189,4 @@ proc editorTabsCreate*(parent: ptr Element, flags: uint32 = 0): ptr EditorTabs =
                         tabsMessage, "EditorTabs")
   let t = cast[ptr EditorTabs](e)
   theEditorTabs = t
-  editor.editorAltUpCb = proc() = editorTabsFocus()
-  editor.editorTabsRepaintCb = proc() =
-    if theEditorTabs != nil:
-      elementRepaint(addr theEditorTabs.e, nil)
   return t

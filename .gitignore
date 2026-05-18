@@ -4,3 +4,6 @@ build/
 *.o
 move.sh
 prawk-debug
+nimble.develop
+nimble.paths
+nimbledeps

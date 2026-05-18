@@ -1,7 +1,7 @@
 import std/strutils
-import luigi
-import term, pump, editor, editortabs, menubar, tree, providers, config, resultspane, terminalstack, clshell, project, commands, minimap, gitpane
-export luigi, editor, menubar
+import rawk_luigi, rawk_bufferlib
+import term, pump, editortabs, menubar, tree, providers, config, resultspane, terminalstack, clshell, project, commands, minimap, gitpane, editor_ref
+export rawk_luigi, rawk_bufferlib, menubar
 
 var
   paneEl: ptr Element
@@ -189,8 +189,18 @@ proc buildUi*(): UiRefs =
   result.editorBody = panelCreate(addr result.editorCol.e,
                                   PANEL_HORIZONTAL or PANEL_EXPAND or
                                   ELEMENT_V_FILL or ELEMENT_H_FILL)
+  let editorHost = EditorHost(
+    indentString:    proc(): string         = config.indentString(),
+    lineNumbers:     proc(): LineNumberMode = config.lineNumbers,
+    cursorMode:      proc(): CursorMode     = config.cursorMode,
+    cursorJumpLines: proc(): int            = config.cursorJumpLines,
+    recordOpen:      proc(p: string)        = config.pushRecent("recents.files", p),
+    onTabsChanged:   proc() =
+      if editortabs.theEditorTabs != nil:
+        elementRepaint(addr editortabs.theEditorTabs.e, nil))
   result.editor = editorCreate(addr result.editorBody.e,
-                               ELEMENT_V_FILL or ELEMENT_H_FILL)
+                               ELEMENT_V_FILL or ELEMENT_H_FILL, editorHost)
+  editor_ref.theEditor = result.editor
   result.minimap = minimapCreate(addr result.editorBody.e)
   minimapSetVisible(result.minimap, config.minimapEnabled)
 

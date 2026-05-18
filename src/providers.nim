@@ -1,4 +1,4 @@
-import luigi, resultspane, commands, menubar, config
+import rawk_luigi, resultspane, commands, menubar, config
 
 type
   PathList = object

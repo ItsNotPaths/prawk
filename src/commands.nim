@@ -1,5 +1,6 @@
 import std/[os, strutils]
-import luigi, project, editor, terminalstack, theme, config, minimap
+import rawk_luigi, rawk_bufferlib
+import project, terminalstack, theme, config, minimap, editor_ref
 
 type
   CmdProc* = proc (args: seq[string]) {.closure.}
@@ -49,24 +50,24 @@ proc cmdTerminalUpdate(args: seq[string]) =
   project.setProjectRoot(target)
 
 proc cmdEditorSave(args: seq[string]) =
-  if editor.theEditor != nil:
-    saveCurrent(editor.theEditor)
+  if theEditor != nil:
+    saveCurrent(theEditor)
 
 proc cmdEditorCopy(args: seq[string]) =
-  if editor.theEditor != nil:
-    editorCopySelection(editor.theEditor)
+  if theEditor != nil:
+    editorCopySelection(theEditor)
 
 proc cmdEditorPaste(args: seq[string]) =
-  if editor.theEditor != nil:
-    editorPasteAtCursor(editor.theEditor)
+  if theEditor != nil:
+    editorPasteAtCursor(theEditor)
 
 proc cmdEditorUndo(args: seq[string]) =
-  if editor.theEditor != nil:
-    editorUndo(editor.theEditor)
+  if theEditor != nil:
+    editorUndo(theEditor)
 
 proc cmdEditorRedo(args: seq[string]) =
-  if editor.theEditor != nil:
-    editorRedo(editor.theEditor)
+  if theEditor != nil:
+    editorRedo(theEditor)
 
 proc cmdWindowFullscreen(args: seq[string]) =
   ## Toggle _NET_WM_STATE_FULLSCREEN on the first non-menu window. luigi
@@ -85,37 +86,37 @@ proc cmdEditorOpen(args: seq[string]) =
   if args.len < 1: return
   let p = args[0]
   if not fileExists(p): return
-  if editor.theEditor != nil:
-    editor.editorOpenFile(editor.theEditor, p)
+  if theEditor != nil:
+    editorOpenFile(theEditor, p)
 
 proc cmdEditorOpenForce(args: seq[string]) =
   if args.len < 1: return
-  editor.editorForceOpenFile(args[0])
+  editorForceOpenFile(args[0])
 
 proc cmdJump(args: seq[string]) =
-  if args.len < 1 or editor.theEditor == nil: return
+  if args.len < 1 or theEditor == nil: return
   let raw = args[0].strip()
   if raw.len == 0: return
   try:
     if raw[0] == '+':
-      editorJumpRelative(editor.theEditor,  parseInt(raw[1 .. ^1]))
+      editorJumpRelative(theEditor,  parseInt(raw[1 .. ^1]))
     elif raw[0] == '-':
-      editorJumpRelative(editor.theEditor, -parseInt(raw[1 .. ^1]))
+      editorJumpRelative(theEditor, -parseInt(raw[1 .. ^1]))
     else:
-      editorJumpAbsolute(editor.theEditor,  parseInt(raw))
+      editorJumpAbsolute(theEditor,  parseInt(raw))
   except ValueError:
     discard
 
 proc cmdTabNext(args: seq[string]) =
-  if editor.theEditor != nil: editorTabNext(editor.theEditor)
+  if theEditor != nil: editorTabNext(theEditor)
 
 proc cmdTabPrev(args: seq[string]) =
-  if editor.theEditor != nil: editorTabPrev(editor.theEditor)
+  if theEditor != nil: editorTabPrev(theEditor)
 
 proc cmdTabClose(args: seq[string]) =
   ## 1-based idx to match the strip's visual order.
-  if editor.theEditor == nil: return
-  let ed = editor.theEditor
+  if theEditor == nil: return
+  let ed = theEditor
   var idx = editorActiveIdx(ed)
   if args.len >= 1:
     try: idx = parseInt(args[0]) - 1
@@ -128,8 +129,8 @@ proc cmdTabClose(args: seq[string]) =
   editorCloseTab(ed, idx)
 
 proc cmdTabCloseForce(args: seq[string]) =
-  if editor.theEditor == nil: return
-  let ed = editor.theEditor
+  if theEditor == nil: return
+  let ed = theEditor
   var idx = editorActiveIdx(ed)
   if args.len >= 1:
     try: idx = parseInt(args[0]) - 1

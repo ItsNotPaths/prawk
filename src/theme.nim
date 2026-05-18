@@ -1,5 +1,5 @@
 import std/[os, strutils, algorithm]
-import luigi
+import rawk_luigi, rawk_bufferlib
 
 type Palette* = object
   bg*, fg*, accent*, muted*, urgent*: uint32
@@ -105,6 +105,14 @@ proc apply(p: Palette) =
   ui.theme.codeOperator    = p.codeOperator
   ui.theme.codePreprocessor = p.codeKeyword
   currentPalette = p
+  # Push palette-derived slots that luigi's UITheme doesn't carry into
+  # rawk_bufferlib's highlight/editor color state.
+  setHighlightTheme(ExtraTheme(
+    codeKeyword:    p.codeKeyword,
+    codeType:       p.codeType,
+    codeReturnType: p.codeReturnType,
+    urgent:         p.urgent,
+    accent:         p.accent))
 
 proc themeNames*(): seq[string] =
   discoverThemes()

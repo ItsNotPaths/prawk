@@ -1,6 +1,6 @@
 import std/[os, strutils]
 import posix, posix/termios
-import luigi, commands, resultspane, project, pty, config, term, terminalstack
+import rawk_luigi, commands, resultspane, project, pty, config, term, terminalstack
 
 proc atexit(p: proc() {.cdecl.}): cint {.importc, header: "<stdlib.h>", discardable.}
 proc clock_gettime(clkId: cint, tp: ptr Timespec): cint

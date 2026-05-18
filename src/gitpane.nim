@@ -6,7 +6,7 @@
 ## not via tab click). Read-only-ish — visualize, don't actuate.
 
 import std/[os, osproc, strutils, streams, times]
-import luigi, font, project, editor, commands, theme
+import rawk_luigi, rawk_bufferlib, project, commands, theme, editor_ref
 
 # editortabs.tabsHeight gives us a matching strip height; importing the
 # module is cheap and keeps the look consistent.
@@ -302,11 +302,11 @@ proc openCommitFileDiff(g: ptr GitPane, ci, fi: int) =
   let path = c.files[fi]
   let (ok, body) = runGit(["show", c.hash, "--", path])
   let synth = "diff://" & c.hash & "/" & path
-  if editor.theEditor != nil:
+  if theEditor != nil:
     if ok:
-      editorOpenSynthetic(editor.theEditor, synth, formatDiffOutput(body))
+      editorOpenSynthetic(theEditor, synth, formatDiffOutput(body))
     else:
-      editorOpenSynthetic(editor.theEditor, synth,
+      editorOpenSynthetic(theEditor, synth,
                           "(git show failed for " & c.hash & " " & path & ")")
 
 proc openWorkingDiff(g: ptr GitPane, idx: int) =
@@ -314,13 +314,13 @@ proc openWorkingDiff(g: ptr GitPane, idx: int) =
   let path = g.status[idx].path
   let (ok, body) = runGit(["diff", "--", path])
   let synth = "diff://WORKING/" & path
-  if editor.theEditor != nil:
+  if theEditor != nil:
     if ok:
-      editorOpenSynthetic(editor.theEditor, synth,
+      editorOpenSynthetic(theEditor, synth,
                           if body.len == 0: "(no diff — file may be untracked or already staged)"
                           else: formatDiffOutput(body))
     else:
-      editorOpenSynthetic(editor.theEditor, synth,
+      editorOpenSynthetic(theEditor, synth,
                           "(git diff failed for " & path & ")")
 
 # ---------- paint --------------------------------------------------------
@@ -677,15 +677,15 @@ proc cmdGbr(args: seq[string]) =
   var gargs = @["branch", "-v"]
   for a in args: gargs.add(a)
   let (_, body) = runGit(gargs)
-  if editor.theEditor != nil:
-    editorOpenSynthetic(editor.theEditor, "diff://BRANCHES/list", body)
+  if theEditor != nil:
+    editorOpenSynthetic(theEditor, "diff://BRANCHES/list", body)
 
 proc cmdGco(args: seq[string]) =
   if args.len < 1: return
   let name = args[0]
   let (ok, msg) = runGit(["checkout", name])
-  if not ok and editor.theEditor != nil:
-    editorOpenSynthetic(editor.theEditor, "diff://CHECKOUT/error",
+  if not ok and theEditor != nil:
+    editorOpenSynthetic(theEditor, "diff://CHECKOUT/error",
                         "git checkout " & name & " failed:\n\n" & msg)
   gitPaneRefresh()
 
@@ -724,25 +724,25 @@ proc splitMultiDiff(raw: string): tuple[header: string, files: seq[tuple[path, b
     result.files.add((path: path, body: bodyBuf))
 
 proc cmdGshow(args: seq[string]) =
-  if args.len < 1 or editor.theEditor == nil: return
+  if args.len < 1 or theEditor == nil: return
   let h = args[0]
   let (_, body) = runGit(["show", h])
   let split = splitMultiDiff(body)
   if split.header.len > 0:
-    editorOpenSynthetic(editor.theEditor,
+    editorOpenSynthetic(theEditor,
                         "diff://" & h & "/__commit",
                         split.header)
   for f in split.files:
-    editorOpenSynthetic(editor.theEditor,
+    editorOpenSynthetic(theEditor,
                         "diff://" & h & "/" & f.path,
                         formatDiffOutput(f.body))
   if split.files.len == 0 and split.header.len == 0:
-    editorOpenSynthetic(editor.theEditor,
+    editorOpenSynthetic(theEditor,
                         "diff://" & h & "/__commit",
                         "(empty diff for " & h & ")")
 
 proc cmdGdiff(args: seq[string]) =
-  if editor.theEditor == nil: return
+  if theEditor == nil: return
   var gargs = @["diff"]
   if args.len >= 1: gargs.add(args[0])
   let (_, body) = runGit(gargs)
@@ -750,18 +750,18 @@ proc cmdGdiff(args: seq[string]) =
     let synth =
       if args.len >= 1: "diff://WORKING/" & args[0]
       else: "diff://WORKING/__all"
-    editorOpenSynthetic(editor.theEditor, synth, "(no changes)")
+    editorOpenSynthetic(theEditor, synth, "(no changes)")
     return
   let split = splitMultiDiff(body)
   for f in split.files:
-    editorOpenSynthetic(editor.theEditor,
+    editorOpenSynthetic(theEditor,
                         "diff://WORKING/" & f.path,
                         formatDiffOutput(f.body))
   if split.files.len == 0:
     let synth =
       if args.len >= 1: "diff://WORKING/" & args[0]
       else: "diff://WORKING/__all"
-    editorOpenSynthetic(editor.theEditor, synth, formatDiffOutput(body))
+    editorOpenSynthetic(theEditor, synth, formatDiffOutput(body))
 
 proc gitPaneInstall*() =
   project.registerProjectChange(proc() = onProjectChange())

@@ -1,5 +1,5 @@
 import std/[os, algorithm]
-import luigi, project, commands, resultspane, menubar
+import rawk_luigi, project, commands, resultspane, menubar
 
 type
   Node = object

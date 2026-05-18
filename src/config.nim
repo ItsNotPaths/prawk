@@ -1,10 +1,10 @@
 import std/[os, strutils]
+import rawk_bufferlib
+export LineNumberMode, CursorMode    # owned by rawk_bufferlib now
 
 type
   TabMode* = enum tmSpaces2, tmSpaces4, tmTab
   FocusTarget* = enum ftTree, ftEditor, ftTerm
-  LineNumberMode* = enum lnmOff, lnmGlobal, lnmRelative
-  CursorMode* = enum cmInsert, cmNormal
   TerminalCopyPaste* = enum tcpIde, tcpLegacy
 
 var

@@ -1,5 +1,5 @@
 import std/os
-import luigi, term, project, config, font
+import rawk_luigi, rawk_bufferlib, term, project, config
 
 type
   TerminalStack* = object

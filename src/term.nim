@@ -1,7 +1,7 @@
 import std/[os, strutils]
 import posix
-import luigi
-import pty, project, font, config, clipboard, theme
+import rawk_luigi, rawk_bufferlib
+import pty, project, config, theme
 
 {.passC: "-I\"" & (currentSourcePath.parentDir.parentDir / "vendor" / "libvterm" / "include") & "\"".}
 {.compile: "../vendor/libvterm/src/encoding.c".}
