@@ -22,7 +22,13 @@ fetch_repo() {
     local name="$1" url="$2"
     local dest="$VENDOR/$name"
     if [ -d "$dest/.git" ]; then
-        echo "  already present: $name"
+        # Existing clone (often from CI cache restore). Always refresh to
+        # origin/HEAD so a stale cache can't bake an old dep into a release —
+        # release 2.5 shipped pre-fix wayluigi because the vendor/ cache was
+        # restored and this branch skipped the fetch entirely.
+        echo "  refreshing $name..."
+        git -C "$dest" fetch --depth=1 origin HEAD
+        git -C "$dest" reset --hard FETCH_HEAD
     else
         echo "  cloning $name..."
         mkdir -p "$VENDOR"

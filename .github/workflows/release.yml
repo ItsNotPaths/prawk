@@ -49,11 +49,23 @@ jobs:
           # archive" further down the install script).
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Resolve dep HEADs
+        # Cache key alone (download-deps.sh hash) doesn't change when our
+        # vendored repos move forward, which baked a pre-fix wayluigi into
+        # release 2.5. Hash the remote HEADs into the key so any dep update
+        # invalidates the cache and triggers a fresh fetch.
+        id: dep-heads
+        run: |
+          luigi_sha=$(git ls-remote https://github.com/ItsNotPaths/wayluigi.git HEAD | cut -f1)
+          rl_sha=$(git ls-remote https://github.com/ItsNotPaths/rawk-luigi.git HEAD | cut -f1)
+          rb_sha=$(git ls-remote https://github.com/ItsNotPaths/rawk-bufferlib.git HEAD | cut -f1)
+          echo "key=${luigi_sha:0:12}-${rl_sha:0:12}-${rb_sha:0:12}" >> "$GITHUB_OUTPUT"
+
       - name: Cache vendor/
         uses: actions/cache@v5
         with:
           path: vendor
-          key: vendor-linux-${{ hashFiles('download-deps.sh') }}
+          key: vendor-linux-${{ hashFiles('download-deps.sh') }}-${{ steps.dep-heads.outputs.key }}
 
       - name: Download deps
         # Must run AFTER toolchain install: download-deps.sh invokes
