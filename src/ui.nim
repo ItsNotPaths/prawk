@@ -148,7 +148,7 @@ proc readerModeOn*(): bool = readerMode
 proc applySidebarVisibility(visible: bool) =
   ## Drive the actual luigi state: split weight + hide flag. Idempotent —
   ## the visible-bool argument is the desired physical state, independent of
-  ## whether the cause was `:ts` or an auto-pop.
+  ## whether the cause was `:zms` or an auto-pop.
   if rootSplitRef == nil or sidebarEl == nil: return
   let currentlyVisible = (sidebarEl.flags and ELEMENT_HIDE) == 0
   if visible == currentlyVisible: return
@@ -174,7 +174,7 @@ proc sidebarEnsureVisible*() =
   applySidebarVisibility(true)
 
 proc sidebarSetHidden*(hidden: bool) =
-  ## `:ts` entry point. Sets the persistent intent, clears any auto-popped
+  ## `:zms` entry point. Sets the persistent intent, clears any auto-popped
   ## state, and updates luigi.
   sidebarHidden = hidden
   sidebarPoppedOpen = false
@@ -260,8 +260,7 @@ proc buildUi*(): UiRefs =
     recordOpen:      proc(p: string)        = config.pushRecent("recents.files", p),
     onTabsChanged:   proc() =
       if editortabs.theEditorTabs != nil:
-        elementRepaint(addr editortabs.theEditorTabs.e, nil),
-    scopeGuides:     proc(): bool           = config.scopeGuidesEnabled)
+        elementRepaint(addr editortabs.theEditorTabs.e, nil))
   result.editor = editorCreate(addr result.editorBody.e,
                                ELEMENT_V_FILL or ELEMENT_H_FILL, editorHost)
   editor_ref.theEditor = result.editor
@@ -294,26 +293,28 @@ proc buildUi*(): UiRefs =
   commands.sidebarEnsureVisibleCb = sidebarEnsureVisible
   pump.onTick = sidebarTickCheck
 
-  # Honor persisted hidden state. Toggled later via :ts / :toggle-sidebar.
+  # Honor persisted hidden state. Toggled later via :zms / :zen-mode-sidebar.
   if not config.sidebarVisible:
     sidebarHidden = true
     applySidebarVisibility(false)
 
-  registerCommand("toggle-sidebar", proc(args: seq[string]) =
-    let on =
+  registerCommand("zen-mode-sidebar", proc(args: seq[string]) =
+    # Argument semantics: an explicit on/off describes the *zen mode*, not the
+    # sidebar — `on` means hide the sidebar (zen engaged), `off` means show it.
+    let hide =
       if args.len >= 1:
         case args[0].toLowerAscii
         of "on", "true", "1", "yes":  true
         of "off", "false", "0", "no": false
         else: sidebarHidden
       else: not sidebarHidden
-    sidebarSetHidden(on)
-    config.sidebarVisible = not on
-    config.setConfigKey("sidebar", if on: "off" else: "on"))
-  registerCommand("ts", proc(args: seq[string]) =
-    discard runCommand("toggle-sidebar", args))
+    sidebarSetHidden(hide)
+    config.sidebarVisible = not hide
+    config.setConfigKey("sidebar", if hide: "off" else: "on"))
+  registerCommand("zms", proc(args: seq[string]) =
+    discard runCommand("zen-mode-sidebar", args))
 
-  registerCommand("reader", proc(args: seq[string]) =
+  registerCommand("zen-mode-terminal", proc(args: seq[string]) =
     let on =
       if args.len >= 1:
         case args[0].toLowerAscii
@@ -322,6 +323,8 @@ proc buildUi*(): UiRefs =
         else: not readerMode
       else: not readerMode
     setReaderMode(on))
+  registerCommand("zmt", proc(args: seq[string]) =
+    discard runCommand("zen-mode-terminal", args))
 
   result.window.e.messageUser = onWinMsg
   log("ui built: pane=" & $cast[uint](paneEl) &
@@ -371,10 +374,6 @@ proc buildUi*(): UiRefs =
   windowRegisterShortcut(result.window, Shortcut(
     code: int(KEYCODE_LETTER('M')), alt: true,
     invoke: proc(cp: pointer) {.cdecl.} = discard runCommand("minimap"),
-    cp: nil))
-  windowRegisterShortcut(result.window, Shortcut(
-    code: int(KEYCODE_LETTER('G')), alt: true,
-    invoke: proc(cp: pointer) {.cdecl.} = discard runCommand("scope_guides"),
     cp: nil))
 
   startPump(result.window)

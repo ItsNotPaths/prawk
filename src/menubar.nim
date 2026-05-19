@@ -126,8 +126,9 @@ proc rebuildFileOptions(mb: ptr Menubar) =
 
 proc rebuildViewOptions(mb: ptr Menubar) =
   mb.items[2].options = @[
-    mkOption("Toggle Fullscreen",  "window.fullscreen"),
-    mkOption("Toggle Reader Mode", "reader"),
+    mkOption("Toggle Fullscreen", "window.fullscreen"),
+    mkOption("Zen Mode: Sidebar", "zen-mode-sidebar"),
+    mkOption("Zen Mode: Terms",   "zen-mode-terminal"),
     mkOption("--- Themes ---"),
   ]
   for n in theme.themeNames():

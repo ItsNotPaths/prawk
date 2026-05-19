@@ -20,7 +20,6 @@ var
   clearOnProjectCd*: bool = false
   terminalCopyPaste*: TerminalCopyPaste = tcpIde
   minimapEnabled*: bool = true
-  scopeGuidesEnabled*: bool = true
   sidebarVisible*: bool = true
   terminalTerm*: string = "alacritty"
 
@@ -110,11 +109,6 @@ proc loadConfig*() =
       case val
       of "on", "true", "yes", "1":   minimapEnabled = true
       of "off", "false", "no", "0":  minimapEnabled = false
-      else: discard
-    of "scope_guides":
-      case val
-      of "on", "true", "yes", "1":   scopeGuidesEnabled = true
-      of "off", "false", "no", "0":  scopeGuidesEnabled = false
       else: discard
     of "sidebar":
       case val

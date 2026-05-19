@@ -446,7 +446,7 @@ proc streamShellLine(body: string) =
   if theClPane.current.name != "shell":
     swapTo(shellProvider())
   # First line of a shell run = "this command actually produced output" —
-  # the cue used to pop the sidebar back open in `:ts` mode. Commands like
+  # the cue used to pop the sidebar back open in `:zms` mode. Commands like
   # `cd` that finish silently leave the sidebar hidden.
   if first and commands.sidebarEnsureVisibleCb != nil:
     commands.sidebarEnsureVisibleCb()

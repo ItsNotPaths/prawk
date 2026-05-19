@@ -7,3 +7,4 @@ prawk-debug
 nimble.develop
 nimble.paths
 nimbledeps
+scratch_*.nim
