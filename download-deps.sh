@@ -68,13 +68,15 @@ else
 fi
 
 echo "==> registering develop links (nimble.paths)"
-# `nimble develop -a` is idempotent for same-path entries; if the user has
-# their own sibling-repo dev setup, the duplicate warning is harmless.
-# `nimble setup` then regenerates nimble.paths so plain `nim c` (used by
-# release.sh / CI) finds the deps via config.nims.
+# Drop stale state before re-registering. `nimble develop -a` *loads* the
+# existing nimble.develop before appending — if a teammate (or CI) inherits
+# a copy with absolute paths from another machine, the load fails and the
+# whole step errors out. Regenerate from scratch every run; the file is
+# strictly machine-local state and lives in .gitignore.
+rm -f "$PROJECT_DIR/nimble.develop" "$PROJECT_DIR/nimble.paths"
 ( cd "$PROJECT_DIR" && \
-    nimble develop -a:"$VENDOR/rawk-luigi"      -y || true; \
-    nimble develop -a:"$VENDOR/rawk-bufferlib"  -y || true; \
+    nimble develop -a:"$VENDOR/rawk-luigi"      -y; \
+    nimble develop -a:"$VENDOR/rawk-bufferlib"  -y; \
     nimble setup -y )
 
 echo ""
