@@ -1,8 +1,6 @@
 import rawk_luigi, rawk_bufferlib
 import term, clshell, menubar, config, minimap, gitpane, editor_ref
 
-proc usleep(us: cuint): cint {.importc, header: "<unistd.h>", discardable.}
-
 var
   blinkTicks: int = 0
   gitPollTicks: int = 0
@@ -50,7 +48,6 @@ proc pumpMessage(e: ptr Element, m: Message, di: cint, dp: pointer): cint {.cdec
         lastMinimapLines = nLines
         lastMinimapDirty = dirty
         elementRepaint(addr theMinimap.e, nil)
-    usleep(20_000)  # ~50 Hz cap so the animate spin doesn't peg a core
   return 0
 
 proc startPump*(window: ptr Window) =
