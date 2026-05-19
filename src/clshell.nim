@@ -45,7 +45,10 @@ type
     ringHead: int       # index of oldest line in ringBuf
     pendingHits: seq[GrepHit]
     state: ClRun
-    refreshTreeOnIdle: bool
+    autoLsOnSilent: bool
+      ## When true, a shell run that produces zero output lines swaps the
+      ## panel to the tree view at sentinel time — the "auto-ls" heuristic.
+      ## Disabled by the `sh ` escape hatch so users can opt out per-command.
 
 const
   ringCap = 500
@@ -57,6 +60,10 @@ var
   theGrepState*: GrepResults
   theShellState*: ShellRun
   theClPane: ptr ResultsPane
+  pendingQueue: seq[string]
+    ## Trailing segments of an `&&`-chain that haven't dispatched yet.
+    ## Async shell segments suspend draining; onSentinelLine resumes it
+    ## once the previous command's sentinel arrives.
 
 # ---------- low-level i/o ----------
 
@@ -380,6 +387,8 @@ proc swapTo(prov: Provider) =
 
 # ---------- run boundary ----------
 
+proc drainQueue()
+
 proc onSentinelLine() =
   let hadHits = theClShell.pendingHits.len > 0
   if theClShell.state == crGrep or hadHits:
@@ -389,14 +398,24 @@ proc onSentinelLine() =
     if hadHits and commands.sidebarEnsureVisibleCb != nil:
       commands.sidebarEnsureVisibleCb()
     swapTo(grepProvider())
+  elif theClShell.autoLsOnSilent and theClShell.state == crShell and
+       theShellState.lines.len == 0 and pendingQueue.len == 0:
+    # Silent shell command (cd / mkdir / touch / rm / git add . / etc.) —
+    # nothing to read in the shell pane and the FS may have changed, so do
+    # the equivalent of `:ls`: refresh tree data and swap the panel to it.
+    # Verbose commands (grep, cat, git status) skip this branch because
+    # they emitted at least one line. Mid-chain segments also skip — the
+    # next queued command would just clobber the auto-swap anyway.
+    discard runCommand("files")
   # shell flow: lines already streamed into theShellState.lines via
   # streamShellLine; panel already swapped at enterShellMode. Nothing to
   # commit here — just drop the flags.
   theClShell.pendingHits.setLen(0)
   theClShell.state = crIdle
-  if theClShell.refreshTreeOnIdle:
-    theClShell.refreshTreeOnIdle = false
-    if commands.treeRefreshCb != nil: commands.treeRefreshCb()
+  theClShell.autoLsOnSilent = false
+  # Resume the chain. If a queued segment kicks off another async shell
+  # run, drainQueue parks again and the next sentinel re-enters here.
+  drainQueue()
 
 # ---------- drain ----------
 
@@ -493,25 +512,17 @@ proc clShellDrain*() =
 
 # ---------- dispatch ----------
 
-proc shouldRefreshTree(cmd: string): bool =
-  ## True for shell commands whose completion should re-list the tree.
-  ## `cd` so the files pane follows the user's location automatically;
-  ## `mkdir`/`touch` so newly-created entries appear without a manual `ls`.
-  ## Conservative — only the operations the user asked us to follow.
-  let head = cmd.strip().splitWhitespace()
-  if head.len == 0: return false
-  head[0] in ["cd", "mkdir", "touch"]
-
 proc enterShellMode(cmd: string, viaHatch = false) =
   ## Set up state for a path-3 shell run, swap the panel to the shell
   ## provider immediately (so the spinner has a destination before output
   ## arrives), and write the command to the dedicated PTY. Output streams
   ## live into the shell provider via `streamShellLine` from drain.
-  ## `viaHatch` = true when invoked through the `t ` escape — disables
-  ## tree-refresh hijacking so the user can opt out of every prawk-side
-  ## side effect on a per-command basis.
+  ## `viaHatch` = true when invoked through the `sh ` escape — disables
+  ## the auto-ls swap so users can opt out per-command (handy when they
+  ## want to watch a command that happens to be silent finish before
+  ## navigating away).
   theClShell.state = crShell
-  theClShell.refreshTreeOnIdle = (not viaHatch) and shouldRefreshTree(cmd)
+  theClShell.autoLsOnSilent = not viaHatch
   theShellState.label = cmd
   theShellState.lines = @[]
   if theClPane != nil:
@@ -520,19 +531,61 @@ proc enterShellMode(cmd: string, viaHatch = false) =
     swapTo(shellProvider())
   clShellWrite(cmd)
 
-proc clDispatch*(line: string) =
+proc splitOnAnd*(s: string): seq[string] =
+  ## Splits `s` on `&&` tokens that appear outside single/double quotes.
+  ## Each returned segment is whitespace-trimmed; empty segments (trailing
+  ## `&&`, runs of `&& &&`) are dropped. The quote handling matches the
+  ## tokenizer in Exrawk's cldispatch so chord-injected paths with spaces
+  ## remain a single segment.
+  result = @[]
+  var cur = ""
+  var inSingle = false
+  var inDouble = false
+  var i = 0
+  while i < s.len:
+    let c = s[i]
+    if inSingle:
+      cur.add(c)
+      if c == '\'': inSingle = false
+      inc i
+    elif inDouble:
+      cur.add(c)
+      if c == '"': inDouble = false
+      elif c == '\\' and i + 1 < s.len:
+        cur.add(s[i + 1]); inc i
+      inc i
+    elif c == '\'':
+      cur.add(c); inSingle = true; inc i
+    elif c == '"':
+      cur.add(c); inDouble = true; inc i
+    elif c == '&' and i + 1 < s.len and s[i + 1] == '&':
+      let t = cur.strip()
+      if t.len > 0: result.add(t)
+      cur = ""
+      i += 2
+    else:
+      cur.add(c); inc i
+  let t = cur.strip()
+  if t.len > 0: result.add(t)
+
+proc dispatchSingle(line: string): bool =
+  ## Run one `&&`-segment through the same pipeline a top-level CL line
+  ## used to take. Returns true iff the dispatch started an async shell
+  ## run — caller must suspend further queue draining until the sentinel
+  ## arrives. Synchronous paths (registry hits, `tN ` routes) return false.
   let trimmed = line.strip()
-  if trimmed.len == 0: return
+  if trimmed.len == 0: return false
   clLog("dispatch: '" & trimmed & "' projectRoot=" & project.projectRoot)
-  # 0. `t ` prefix — escape hatch. Skip every hijack (registry alias,
+  # 0. `sh ` prefix — escape hatch. Skip every hijack (registry alias,
   # ls→files, etc.) and pipe the rest straight to the dedicated shell
   # with live output streaming.
-  if trimmed.len > 2 and trimmed[0] == 't' and trimmed[1] == ' ':
-    let body = trimmed[2 .. ^1].strip()
-    if body.len == 0: return
-    clLog("  -> t-prefix shell: " & body)
+  if trimmed.len > 3 and trimmed[0] == 's' and trimmed[1] == 'h' and
+     trimmed[2] == ' ':
+    let body = trimmed[3 .. ^1].strip()
+    if body.len == 0: return false
+    clLog("  -> sh-prefix shell: " & body)
     enterShellMode(body, viaHatch = true)
-    return
+    return true
   # 0b. `tN ` prefix — route the rest to terminal N (1-based) in the stack.
   # `t1 ls` runs `ls` inside terminal 1 instead of the CL shell. Skips the
   # registry / fallthrough so commands like `t2 grep foo` don't get hijacked
@@ -542,7 +595,7 @@ proc clDispatch*(line: string) =
     while i < trimmed.len and trimmed[i] in {'0'..'9'}: inc i
     if i < trimmed.len and trimmed[i] == ' ':
       let body = trimmed[i + 1 .. ^1].strip()
-      if body.len == 0: return
+      if body.len == 0: return false
       var tIdx = -1
       try: tIdx = parseInt(trimmed[1 ..< i]) - 1
       except ValueError: discard
@@ -552,20 +605,40 @@ proc clDispatch*(line: string) =
           clLog("  -> t" & $(tIdx + 1) & " shell: " & body)
           termRunCmd(tm, body)
           stackFocusAt(theTermStack, tIdx)
-          return
+          return false
   let parts = trimmed.splitWhitespace()
   let name = parts[0]
   let args = if parts.len > 1: parts[1 .. ^1] else: @[]
   # 1. registered IDE command
   if runCommand(name, args):
     clLog("  -> registry hit: " & name)
-    return
+    return false
   # 2. fall through to the dedicated shell — live-stream output.
   # cd is not intercepted: it changes the CL shell's cwd like any normal
   # shell. Use `:terminal.update` (alias `:tu`) to broadcast that location
   # to unlocked terminals + tree + git pane.
   clLog("  -> shell fallthrough")
   enterShellMode(trimmed)
+  return true
+
+proc drainQueue() =
+  ## Pop segments until the queue empties or a segment starts an async
+  ## shell run. Async runs suspend the chain — onSentinelLine re-invokes
+  ## drainQueue once the previous command's sentinel arrives.
+  while pendingQueue.len > 0:
+    let seg = pendingQueue[0]
+    pendingQueue.delete(0)
+    if dispatchSingle(seg): return
+
+proc clDispatch*(line: string) =
+  ## Public entry. Splits the line on `&&` into segments, appends them to
+  ## the pending queue, and drains. While a previous chain is still in
+  ## flight (async shell mid-run), new segments simply queue behind it.
+  let segs = splitOnAnd(line)
+  if segs.len == 0: return
+  for seg in segs: pendingQueue.add(seg)
+  if theClShell.state != crIdle: return    # in-flight shell will resume us
+  drainQueue()
 
 # ---------- install ----------
 

@@ -153,7 +153,8 @@ proc treeProvider*(): Provider =
 proc treeRefresh*() =
   ## Re-list the tree from the CL shell's current cwd, preserving any
   ## still-reachable expanded subdirs by path. Called by `:files`/`:tree`
-  ## (so `ls` picks up new files) and by clshell after mkdir/touch.
+  ## (so `ls` picks up new files), and indirectly by clshell whenever a
+  ## silent shell command runs (auto-ls path: `swapBackToTree` calls in).
   if theTreePane == nil: return
   var expandedPaths: seq[string]
   for n in theTreeState.nodes:
@@ -186,7 +187,6 @@ proc treeInstall*(pane: ptr ResultsPane) =
   paneSetProvider(pane, treeProvider())
   registerCommand("files", swapBackToTree)
   registerCommand("tree", swapBackToTree)
-  commands.treeRefreshCb = proc() = treeRefresh()
   project.registerProjectChange(proc() =
     rebuildRoot(addr theTreeState)
     if theTreePane != nil:

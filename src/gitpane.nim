@@ -607,6 +607,15 @@ proc gitPaneMessage(element: ptr Element, message: Message,
     let shift = (win != nil and win.shift)
     let code = k.code
     if alt: return 0   # let window-level pane nav handle Alt+*
+    # Plain `i` / Insert hops focus to the editor — mirrors resultspane so
+    # both sidebar panes share the same "back to typing" gesture.
+    let ctrl = (win != nil and win.ctrl)
+    if not ctrl and not shift and
+       (code == int(KEYCODE_LETTER('I')) or code == int(KEYCODE_INSERT)):
+      if theEditor != nil:
+        elementFocus(addr theEditor.e)
+        elementRepaint(addr theEditor.e, nil)
+      return 1
     if code == int(KEYCODE_TAB):
       g.focused = if g.focused == gsStatus: gsLog else: gsStatus
       elementRepaint(element, nil)

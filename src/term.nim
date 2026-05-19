@@ -1,7 +1,7 @@
 import std/[os, strutils]
 import posix
 import rawk_luigi, rawk_bufferlib
-import pty, project, config, theme
+import pty, project, config, theme, iconfont
 
 {.passC: "-I\"" & (currentSourcePath.parentDir.parentDir / "vendor" / "libvterm" / "include") & "\"".}
 {.compile: "../vendor/libvterm/src/encoding.c".}
@@ -344,7 +344,11 @@ proc terminalMessage(element: ptr Element, message: Message, di: cint, dp: point
             cast[cstring](addr buf[0]), 1,
             fg, cint(ALIGN_LEFT), nil)
         else:
-          drawGlyphCp(painter, x, y, cint(cp), fg)
+          # Routes non-ASCII through the icon-font fallback: regular Unicode
+          # stays on the primary face; PUA / Nerd-Font codepoints the
+          # primary lacks get rendered from the symbol face instead of
+          # painting .notdef.
+          drawGlyphWithFallback(painter, x, y, cint(cp), fg)
     if element.window != nil and element.window.focused == element:
       let b = t.e.bounds
       drawBorder(painter, b, currentPalette.accent, Rectangle(l: 2, r: 2, t: 2, b: 2))

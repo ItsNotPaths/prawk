@@ -1,4 +1,4 @@
-import rawk_luigi, rawk_bufferlib, commands, theme
+import rawk_luigi, rawk_bufferlib, commands, theme, editor_ref
 
 type
   Provider* = object
@@ -179,6 +179,17 @@ proc paneMessage(element: ptr Element, message: Message, di: cint, dp: pointer):
     # reserved for stub-copy until pane selection ships.
     if ctrl and code == int(KEYCODE_LETTER('C')):
       if shift: discard runCommand("cl.interrupt")
+      return 1
+
+    # Plain `i` / Insert jumps focus to the editor — sidebar shortcut for
+    # "back to typing". Modified variants (Shift+Insert paste, Ctrl+Insert
+    # copy) pass through; the terminal pane intentionally has no equivalent
+    # because users need `i` available as a regular character there.
+    if not ctrl and not shift and
+       (code == int(KEYCODE_LETTER('I')) or code == int(KEYCODE_INSERT)):
+      if theEditor != nil:
+        elementFocus(addr theEditor.e)
+        elementRepaint(addr theEditor.e, nil)
       return 1
 
     if p.current.onKey != nil and p.current.onKey(p.current.state, code.cint, ctrl, shift):

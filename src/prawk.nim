@@ -1,6 +1,6 @@
 import std/os
 import rawk_bufferlib
-import ui, theme, project, commands, config
+import ui, theme, project, commands, config, iconfont
 
 proc resolveArgv() =
   if paramCount() == 0:
@@ -20,7 +20,8 @@ initialise()
 config.loadConfig()
 theme.activeTheme = config.themePref
 loadInitialTheme()
-loadFont()
+loadFont(config.fontSize)
+installIconFont()
 loadAllSyntaxes()
 resolveArgv()
 registerBuiltins()

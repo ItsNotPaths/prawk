@@ -51,7 +51,7 @@ Config (optional): `~/.config/prawk/config` — see [Config](#config) below.
 | `Alt+F` / `Alt+E` / `Alt+V` | Open File / Edit / View menu |
 | `Alt+W` | Inject `:jump ` into the CL |
 | `Esc` | Close CL, restore prior focus |
-| `Enter` | Dispatch (registered command → `tN` / `t` prefix → shell) |
+| `Enter` | Dispatch (registered command → `tN` / `sh` prefix → shell). Chain segments with `&&` (`cd .. && tu`). |
 
 The CL is a real shell with its own headless PTY. `cd` is plain shell behavior
 — it changes the CL shell's cwd and nothing else. To broadcast that location to
@@ -60,15 +60,22 @@ the rest of the IDE (tree, git pane, unlocked terminals), run `:terminal.update`
 with a path arg it targets that path. Output flowing through the CL is parsed
 for `path:line[:col]:text` hits and shown in a `grep` results pane.
 
+A shell command that produces no output (`mkdir`, `touch`, `cd`, `rm`, `git add
+.`, …) auto-swaps the panel back to the file tree at the sentinel — the
+"auto-ls" heuristic. Commands that emit any line (`cat`, `grep`, `git status`)
+keep the shell pane visible. Chain segments with `&&`: `cd src && tu` runs the
+shell `cd`, waits for the sentinel, then fires the IDE-side `:tu`.
+
 **When something is injected into the CL** (e.g. tree right-click, projects
 recents, dirty-tab close prompt, `Alt+W` jump), the palette gets a red outline
 (theme key `cl_inject`) — visual cue that the buffer wasn't typed by you. The
 outline clears on the first keystroke or when you Esc/Enter.
 
-**Prefixes**:
-- `t <cmd>` — skip every hijack (registered commands, `ls`→files, etc.) and
-  pipe the rest straight to the CL shell. E.g. `t ls` lists the cwd literally
-  instead of swapping to the file provider.
+**Prefixes** (per-segment, so they work inside an `&&` chain too):
+- `sh <cmd>` — escape hatch. Skip every hijack (registered commands,
+  `ls`→files, etc.) and pipe the rest straight to the CL shell. Also disables
+  auto-ls for that segment. E.g. `sh ls` lists the cwd literally instead of
+  swapping to the file provider.
 - `tN <cmd>` — route `<cmd>` to terminal N (1-based) in the right-stack
   instead of the CL shell. E.g. `t1 ls` runs `ls` inside terminal 1; `t2 vim
   foo.nim` opens vim inside terminal 2. Focuses that terminal afterwards.
@@ -99,6 +106,7 @@ outline clears on the first keystroke or when you Esc/Enter.
 | `j` / `k` / `Up` / `Down` | Move selection |
 | `Enter` | Activate (open file, expand/collapse dir, swap provider) |
 | `Right` / `Left` | Expand / collapse dir |
+| `i` / `Insert` | Focus the editor (works from the git pane too) |
 | `Shift+Enter` / right-click on dir | Inject `:tu <path>` into the CL |
 | `Esc` | Pop back to previous provider (e.g. shell results → tree) |
 
@@ -151,7 +159,13 @@ terminal_copy_paste: ide       # ide (Ctrl+C copies if selection) | legacy
 minimap: on
 sidebar: on
 grep_ignore: vendor,build,.git,node_modules
+font_size: 14
+icon_font_path:                # empty → probe Symbols Nerd Font via fc-match
 ```
+
+`icon_font_path` backs the symbol-font fallback: when the primary mono lacks a
+glyph (PUA / Nerd-Font icons that TUIs like claude-code emit), the terminal
+pane paints that cell from this face instead of `.notdef` tofu.
 
 Other state:
 

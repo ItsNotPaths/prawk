@@ -13,7 +13,6 @@ var
   openPaletteWithCb*: proc(text: string) {.closure.}
   clDispatchCb*: proc(line: string) {.closure.}
   clShellCwdCb*: proc(): string {.closure.}
-  treeRefreshCb*: proc() {.closure.}
   sidebarEnsureVisibleCb*: proc() {.closure.}
     ## Cross-module hook used by content producers (tree, providers, shell
     ## stream, grep results) to pop the sidebar into view if `:zms` has it

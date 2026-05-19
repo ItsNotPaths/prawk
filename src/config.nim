@@ -22,6 +22,8 @@ var
   minimapEnabled*: bool = true
   sidebarVisible*: bool = true
   terminalTerm*: string = "alacritty"
+  iconFontPath*: string = ""    # empty → probe at startup, see iconfont.nim
+  fontSize*: uint32 = 14
 
 proc tildify*(p: string): string =
   let h = getHomeDir()
@@ -117,6 +119,13 @@ proc loadConfig*() =
       else: discard
     of "terminal_term":
       if val.len > 0: terminalTerm = val
+    of "icon_font_path":
+      iconFontPath = val
+    of "font_size":
+      try:
+        let n = parseInt(val)
+        if n >= 6 and n <= 64: fontSize = uint32(n)
+      except ValueError: discard
     else: discard
 
 proc setConfigKey*(key, val: string) =
